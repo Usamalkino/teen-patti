@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Teen Patti</title>
+<title>Teen Patti — तीन पत्ती</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Noto+Serif+Devanagari:wght@400;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 
 <!-- Firebase v9 compat (CDN) -->
@@ -189,7 +189,7 @@ body{background:var(--dark);font-family:'Crimson Pro',Georgia,serif;color:var(--
 <div id="config" class="screen active">
   <div class="logo">
     <h1>Teen Patti</h1>
-    <span class="devanagari"></span>
+    <span class="devanagari">तीन पत्ती</span>
     <div class="card-suits">♠ ♥ ♦ ♣</div>
     <div class="subtitle">Multiplayer</div>
   </div>
@@ -217,7 +217,7 @@ body{background:var(--dark);font-family:'Crimson Pro',Georgia,serif;color:var(--
 <div id="home" class="screen">
   <div class="logo">
     <h1>Teen Patti</h1>
-    <span class="devanagari"></span>
+    <span class="devanagari">तीन पत्ती</span>
     <div class="card-suits">♠ ♥ ♦ ♣</div>
   </div>
   <div class="panel">
@@ -260,7 +260,7 @@ body{background:var(--dark);font-family:'Crimson Pro',Georgia,serif;color:var(--
      SCREEN 3 — LOBBY (host waits)
 ══════════════════════════════════════ -->
 <div id="lobby" class="screen">
-  <div class="logo"><h1>Teen Patti</h1><span class="devanagari"></span></div>
+  <div class="logo"><h1>Teen Patti</h1><span class="devanagari">तीन पत्ती</span></div>
   <div class="lobby-panel">
     <div class="room-code-display">
       <div class="label">Room Code — Share with friends</div>
@@ -758,9 +758,14 @@ function hostNextRound(){
   if (!ME.isHost) return;
   roomRef.get().then(snap=>{
     const room = snap.val();
-    let players = (room.gameState?.players || room.players || [])
-      .filter(p => p.coins >= (room.boot||10))
-      .map(p => ({ name: p.name, coins: p.coins, ready: true }));
+    // Use room.players as source of truth for order, update coins from gameState
+    const gameStatePlayers = room.gameState?.players || [];
+    let players = (room.players || [])
+      .map(p => {
+        const gs_p = gameStatePlayers.find(gsp => gsp.name === p.name);
+        return { name: p.name, coins: gs_p?.coins || p.coins, ready: true };
+      })
+      .filter(p => p.coins >= (room.boot||10));
     if (players.length < 2) { showToast('Not enough players with coins!'); return; }
     // rotate dealer
     players.push(players.shift());
