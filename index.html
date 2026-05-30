@@ -147,6 +147,17 @@ body{background:var(--dark);font-family:'Crimson Pro',Georgia,serif;color:var(--
 .blind-notice{font-size:.78rem;color:rgba(240,230,204,.4);text-align:center;font-style:italic;margin-top:4px}
 .waiting-notice{font-size:.88rem;color:rgba(240,230,204,.45);text-align:center;padding:10px 0;font-style:italic}
 
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{background:rgba(10,30,18,.98);border:2px solid var(--gold);border-radius:20px;padding:32px;text-align:center;max-width:420px;box-shadow:0 0 50px rgba(201,168,76,.3)}
+.modal-box h2{color:var(--gold);margin-bottom:12px;font-size:1.4rem}
+.modal-box p{color:rgba(240,230,204,.75);margin-bottom:20px;font-size:1rem}
+.modal-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.modal-btn{padding:10px 20px;border-radius:10px;border:none;font-family:'Playfair Display',serif;font-size:.95rem;cursor:pointer;transition:all .2s;font-weight:600}
+.modal-btn.accept{background:var(--gold);color:var(--dark)}
+.modal-btn.accept:hover{transform:translateY(-2px)}
+.modal-btn.decline{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.4);color:var(--gold)}
+.modal-btn.decline:hover{background:rgba(201,168,76,.25)}
+
 .game-log{background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.12);border-radius:10px;padding:9px 12px;max-height:100px;overflow-y:auto;font-size:.8rem;color:rgba(240,230,204,.55);line-height:1.6}
 .game-log p{margin:0}
 .game-log p.highlight{color:var(--gold-pale)}
@@ -521,6 +532,7 @@ function buildInitialGameState(players, boot){
     currentPlayer: 0,
     log: ['Round started. Boot collected from all players.'],
     raiseOpen: false,
+    sideShowRequest: null,
   };
 }
 
@@ -536,6 +548,25 @@ function renderGameFromState(gs, room){
 
   const me = gs.players[myIdx];
   if (!me) return;
+  
+  // Check if there's a pending side-show request for this player
+  if (gs.sideShowRequest && gs.sideShowRequest.targetIdx === myIdx && gs.sideShowRequest.status === 'pending') {
+    const initiator = gs.players[gs.sideShowRequest.initiatorIdx];
+    el.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-box">
+          <h2>⚔️ Side-Show Request</h2>
+          <p>${initiator.name} is offering you a side-show!</p>
+          <div class="modal-buttons">
+            <button class="modal-btn accept" onclick="respondToSideShow(true)">Accept</button>
+            <button class="modal-btn decline" onclick="respondToSideShow(false)">Decline</button>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const isBlind = !me.seen;
   const callAmt = isBlind ? gs.currentStake / 2 : gs.currentStake;
   const activePlayers = gs.players.filter(p => !p.folded).length;
@@ -572,6 +603,7 @@ function renderGameFromState(gs, room){
         <button class="act-btn raise ${!me.seen||me.coins<gs.currentStake*2?'disabled':''}"
           onclick="toggleRaiseUI()" ${!me.seen||me.coins<gs.currentStake*2?'disabled':''}>Raise</button>
         ${activePlayers===2&&me.seen ? `<button class="act-btn show" onclick="doShow()">Show</button>` : ''}
+        ${activePlayers>2&&me.seen ? `<button class="act-btn show" onclick="doSideShow()">Side-Show</button>` : ''}
       </div>
       <div id="raiseSection"></div>
       ${isBlind?'<div class="blind-notice">Playing blind — half the stake required</div>':''}
@@ -703,6 +735,71 @@ function doShow(){
     best.coins += gs.pot;
     gs.log.push(`${best.name} wins the pot of ${gs.pot}🪙!`);
     roomRef.update({ status:'roundOver', gameState: gs });
+  });
+}
+
+function doSideShow(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    const p = gs.players[ME.playerIdx];
+    const showCost = gs.currentStake * 2;
+    if (!p.seen || p.coins < showCost) return;
+    
+    // Find previous active player (going backwards from current player)
+    let targetIdx = (ME.playerIdx - 1 + gs.players.length) % gs.players.length;
+    let tries = 0;
+    while (gs.players[targetIdx].folded && tries < gs.players.length) {
+      targetIdx = (targetIdx - 1 + gs.players.length) % gs.players.length;
+      tries++;
+    }
+    
+    if (tries >= gs.players.length || gs.players[targetIdx].folded) return;
+    
+    // Set side-show request
+    gs.sideShowRequest = {
+      initiatorIdx: ME.playerIdx,
+      targetIdx: targetIdx,
+      status: 'pending'
+    };
+    gs.log.push(`${p.name} offered a side-show to ${gs.players[targetIdx].name}!`);
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function respondToSideShow(accepted){
+  getGS(gs => {
+    const req = gs.sideShowRequest;
+    if (!req || req.targetIdx !== ME.playerIdx) return;
+    
+    const initiator = gs.players[req.initiatorIdx];
+    const me = gs.players[req.targetIdx];
+    const showCost = gs.currentStake * 2;
+    
+    if (accepted) {
+      // Both pay for side-show
+      initiator.coins -= showCost;
+      me.coins -= showCost;
+      gs.pot += showCost * 2;
+      
+      // Compare hands
+      const cmp = compareHands(initiator.cards, me.cards);
+      if (cmp > 0) {
+        // Initiator wins
+        me.folded = true;
+        gs.log.push(`Side-show: ${initiator.name} wins over ${me.name}!`);
+      } else {
+        // Target wins
+        initiator.folded = true;
+        gs.log.push(`Side-show: ${me.name} wins over ${initiator.name}!`);
+        gs.currentPlayer = nextActivePlayer(gs, req.initiatorIdx);
+      }
+    } else {
+      gs.log.push(`${me.name} declined side-show. ${initiator.name} can choose another action.`);
+      // Initiator's turn continues - no change to currentPlayer
+    }
+    
+    gs.sideShowRequest = null;
+    roomRef.update({ gameState: gs });
   });
 }
 
