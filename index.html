@@ -867,7 +867,8 @@ function hostNextRound(){
     // rotate dealer
     players.push(players.shift());
     const gs = buildInitialGameState(players, room.boot);
-    roomRef.update({ status:'playing', gameState: gs });
+    // Update room.players with rotated order so next round has correct order
+    roomRef.update({ status:'playing', gameState: gs, players: players });
   });
 }
 
