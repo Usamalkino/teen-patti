@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teen Patti — तीन पत्ती</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Noto+Serif+Devanagari:wght@400;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+
+<!-- Firebase v9 compat (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+:root {
+  --green:#1a4a2e; --green-light:#246b42; --green-felt:#1e5c38;
+  --gold:#c9a84c; --gold-light:#e8c96a; --gold-pale:#f5e6b8;
+  --cream:#fdf6e3; --red:#c0392b; --red-dark:#96281b;
+  --dark:#0d1f14; --text-on-dark:#f0e6cc;
+  --shadow:0 8px 32px rgba(0,0,0,.5);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--dark);font-family:'Crimson Pro',Georgia,serif;color:var(--text-on-dark);min-height:100vh;overflow-x:hidden}
+
+#table-bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 50% 50%,var(--green-felt) 0%,var(--green) 60%,var(--dark) 100%)}
+#table-bg::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px)}
+#table-bg::after{content:'';position:absolute;inset:20px;border:2px solid rgba(201,168,76,.25);border-radius:50%;box-shadow:0 0 0 8px rgba(201,168,76,.08),0 0 80px rgba(201,168,76,.1);pointer-events:none}
+
+.screen{position:relative;z-index:1;display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* ── LOGO ── */
+.logo{text-align:center;margin-bottom:32px}
+.logo h1{font-family:'Playfair Display',serif;font-size:clamp(2.4rem,8vw,4.5rem);font-weight:900;color:var(--gold);text-shadow:0 2px 20px rgba(201,168,76,.4);line-height:1;letter-spacing:2px}
+.logo .devanagari{font-family:'Noto Serif Devanagari',serif;font-size:clamp(1.1rem,3vw,1.6rem);color:var(--gold-pale);opacity:.75;display:block;margin-top:4px}
+.logo .subtitle{font-size:.9rem;color:rgba(240,230,204,.5);letter-spacing:4px;text-transform:uppercase;margin-top:6px}
+.card-suits{font-size:1.8rem;color:var(--gold);opacity:.4;letter-spacing:10px;margin-top:10px}
+
+/* ── PANELS ── */
+.panel{background:rgba(10,30,18,.88);border:1px solid rgba(201,168,76,.3);border-radius:20px;padding:32px 36px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.field-label{font-size:.72rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:9px;display:block}
+
+/* tabs */
+.tabs{display:flex;gap:0;margin-bottom:24px;border:1px solid rgba(201,168,76,.25);border-radius:10px;overflow:hidden}
+.tab-btn{flex:1;padding:11px;background:transparent;border:none;color:rgba(240,230,204,.5);font-family:'Crimson Pro',serif;font-size:1rem;cursor:pointer;transition:all .2s}
+.tab-btn.active{background:rgba(201,168,76,.2);color:var(--gold)}
+
+.text-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:8px;color:var(--cream);font-family:'Crimson Pro',serif;font-size:1rem;padding:10px 14px;outline:none;transition:border-color .2s;margin-bottom:14px}
+.text-input:focus{border-color:var(--gold)}
+.text-input.big{font-size:1.8rem;letter-spacing:8px;text-align:center;text-transform:uppercase}
+
+.player-count-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.cnt-btn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(201,168,76,.4);background:transparent;color:var(--text-on-dark);font-family:'Crimson Pro',serif;font-size:1.1rem;cursor:pointer;transition:all .2s}
+.cnt-btn:hover{border-color:var(--gold);color:var(--gold)}
+.cnt-btn.active{background:var(--gold);border-color:var(--gold);color:var(--dark);font-weight:700}
+
+.player-names{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.player-name-row{display:flex;align-items:center;gap:10px}
+.player-num{width:26px;height:26px;border-radius:50%;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);display:flex;align-items:center;justify-content:center;font-size:.78rem;color:var(--gold);flex-shrink:0}
+
+.boot-row{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.boot-row input[type=number]{width:90px;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:8px;color:var(--cream);font-family:'Crimson Pro',serif;font-size:1rem;padding:9px 12px;outline:none}
+.boot-row input[type=number]:focus{border-color:var(--gold)}
+.coin-label{color:var(--gold-pale);opacity:.7;font-size:.9rem}
+
+.btn-primary{width:100%;padding:15px;background:linear-gradient(135deg,var(--gold) 0%,var(--gold-light) 50%,var(--gold) 100%);border:none;border-radius:12px;color:var(--dark);font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(201,168,76,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(201,168,76,.4)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* firebase config box */
+.config-notice{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:.85rem;line-height:1.6;color:rgba(240,230,204,.7)}
+.config-notice a{color:var(--gold);text-decoration:underline}
+.config-inputs{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.config-inputs input{background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.2);border-radius:6px;color:var(--cream);font-family:'Crimson Pro',serif;font-size:.88rem;padding:8px 12px;outline:none}
+.config-inputs input:focus{border-color:var(--gold)}
+.config-inputs input::placeholder{opacity:.4}
+
+/* ── LOBBY ── */
+#lobby{padding:40px 20px}
+.lobby-panel{background:rgba(10,30,18,.92);border:1px solid rgba(201,168,76,.3);border-radius:20px;padding:32px 36px;width:100%;max-width:460px;box-shadow:var(--shadow)}
+.room-code-display{text-align:center;margin-bottom:20px}
+.room-code-display .label{font-size:.72rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:6px}
+.room-code-display .code{font-family:'Playfair Display',serif;font-size:2.8rem;color:var(--gold);letter-spacing:12px;font-weight:900;text-shadow:0 0 20px rgba(201,168,76,.3)}
+.divider-line{width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent);margin:18px 0}
+.players-waiting{margin-bottom:20px}
+.players-waiting .pwlabel{font-size:.72rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:10px}
+.player-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.2);border-radius:20px;padding:5px 14px;font-size:.9rem;margin:4px 4px 4px 0}
+.player-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green-light)}
+.player-pill .dot.host{background:var(--gold)}
+.lobby-hint{font-size:.82rem;color:rgba(240,230,204,.45);text-align:center;margin-bottom:16px}
+
+/* ── WAITING ── */
+#waiting{padding:40px 20px;text-align:center}
+.waiting-inner{background:rgba(10,30,18,.95);border:1px solid rgba(201,168,76,.35);border-radius:24px;padding:44px 36px;max-width:400px;box-shadow:var(--shadow)}
+.waiting-inner h2{font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--gold);margin-bottom:8px}
+.waiting-inner p{color:rgba(240,230,204,.6);margin-bottom:20px;font-size:1rem}
+.spinner{width:40px;height:40px;border:3px solid rgba(201,168,76,.2);border-top:3px solid var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── GAME ── */
+#game{padding:16px;justify-content:flex-start;align-items:stretch;gap:12px}
+.pot-bar{display:flex;align-items:center;justify-content:center;gap:16px;background:rgba(0,0,0,.4);border:1px solid rgba(201,168,76,.25);border-radius:40px;padding:9px 24px;flex-wrap:wrap}
+.pot-label{font-size:.72rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.7}
+.pot-amount{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--gold);font-weight:700}
+.current-stake{font-size:.82rem;color:rgba(240,230,204,.5)}
+.your-turn-badge{text-align:center;font-size:.72rem;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,.6);padding:4px}
+
+.player-area{background:rgba(0,0,0,.35);border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:14px 16px}
+.player-area.my-turn{border-color:rgba(201,168,76,.55);box-shadow:0 0 20px rgba(201,168,76,.1)}
+.player-area.not-my-turn{opacity:.75}
+.player-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.player-name-tag{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--gold)}
+.player-coins{font-size:.88rem;color:var(--gold-pale);opacity:.8}
+.player-status-tag{font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:2px 9px;border-radius:20px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid rgba(201,168,76,.3)}
+.player-status-tag.folded{background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.1)}
+.player-status-tag.active-turn{background:rgba(201,168,76,.3);animation:pulse-gold 1.2s infinite}
+@keyframes pulse-gold{0%,100%{opacity:1}50%{opacity:.6}}
+
+.cards-row{display:flex;gap:8px;margin-bottom:12px}
+.card{width:56px;height:78px;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.4);position:relative;user-select:none}
+.card.face-down{background:linear-gradient(135deg,#1a3a26 0%,#0d2218 100%);border:1px solid rgba(201,168,76,.3)}
+.card.face-down::before{content:'🂠';font-size:2.2rem;opacity:.2}
+.card.face-up{background:#fff;border:1px solid #ddd;flex-direction:column;justify-content:space-between;padding:4px 5px;font-size:.8rem;line-height:1}
+.card.face-up .rank{font-size:1rem;font-weight:700}
+.card.face-up .suit-big{font-size:1.4rem}
+.card.red-card{color:var(--red)}
+.card.black-card{color:#111}
+
+.actions-row{display:flex;flex-wrap:wrap;gap:7px}
+.act-btn{flex:1;min-width:76px;padding:9px 10px;border-radius:9px;border:1px solid;font-family:'Crimson Pro',serif;font-size:.92rem;cursor:pointer;transition:all .15s;font-weight:600}
+.act-btn:hover{transform:translateY(-1px)}
+.act-btn.fold{background:rgba(150,40,27,.2);border-color:var(--red-dark);color:#e08070}
+.act-btn.fold:hover{background:rgba(150,40,27,.4)}
+.act-btn.call{background:rgba(30,92,56,.4);border-color:var(--green-light);color:#80d4a0}
+.act-btn.call:hover{background:rgba(30,92,56,.6)}
+.act-btn.raise{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold)}
+.act-btn.raise:hover{background:rgba(201,168,76,.3)}
+.act-btn.see-cards{background:rgba(60,40,120,.3);border-color:#9b8ae0;color:#c5bbe8}
+.act-btn.see-cards:hover{background:rgba(60,40,120,.5)}
+.act-btn.show{background:rgba(200,150,20,.25);border-color:var(--gold-light);color:var(--gold-light)}
+.act-btn.show:hover{background:rgba(200,150,20,.45)}
+.act-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.raise-row{display:flex;align-items:center;gap:7px;width:100%;margin-top:4px}
+.raise-row input{flex:1;padding:7px 11px;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.3);border-radius:7px;color:var(--cream);font-family:'Crimson Pro',serif;font-size:.95rem;outline:none}
+.raise-row input:focus{border-color:var(--gold)}
+.raise-confirm{padding:7px 14px;border-radius:7px;background:var(--gold);border:none;color:var(--dark);font-family:'Crimson Pro',serif;font-size:.9rem;font-weight:700;cursor:pointer}
+.blind-notice{font-size:.78rem;color:rgba(240,230,204,.4);text-align:center;font-style:italic;margin-top:4px}
+.waiting-notice{font-size:.88rem;color:rgba(240,230,204,.45);text-align:center;padding:10px 0;font-style:italic}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{background:rgba(10,30,18,.98);border:2px solid var(--gold);border-radius:20px;padding:32px;text-align:center;max-width:420px;box-shadow:0 0 50px rgba(201,168,76,.3)}
+.modal-box h2{color:var(--gold);margin-bottom:12px;font-size:1.4rem}
+.modal-box p{color:rgba(240,230,204,.75);margin-bottom:20px;font-size:1rem}
+.modal-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.modal-btn{padding:10px 20px;border-radius:10px;border:none;font-family:'Playfair Display',serif;font-size:.95rem;cursor:pointer;transition:all .2s;font-weight:600}
+.modal-btn.accept{background:var(--gold);color:var(--dark)}
+.modal-btn.accept:hover{transform:translateY(-2px)}
+.modal-btn.decline{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.4);color:var(--gold)}
+.modal-btn.decline:hover{background:rgba(201,168,76,.25)}
+
+.game-log{background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.12);border-radius:10px;padding:9px 12px;max-height:100px;overflow-y:auto;font-size:.8rem;color:rgba(240,230,204,.55);line-height:1.6}
+.game-log p{margin:0}
+.game-log p.highlight{color:var(--gold-pale)}
+
+/* ── WINNER ── */
+#winner{text-align:center;padding:40px 20px}
+.winner-panel{background:rgba(10,30,18,.95);border:2px solid var(--gold);border-radius:24px;padding:44px 36px;max-width:440px;box-shadow:0 0 60px rgba(201,168,76,.25),var(--shadow)}
+.winner-emoji{font-size:3.5rem;margin-bottom:10px}
+.winner-panel h2{font-family:'Playfair Display',serif;font-size:.95rem;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:6px}
+.winner-name{font-family:'Playfair Display',serif;font-size:2.5rem;color:var(--gold);font-weight:900;text-shadow:0 0 30px rgba(201,168,76,.4);margin-bottom:6px}
+.winner-hand{font-size:.95rem;color:var(--gold-pale);opacity:.75;margin-bottom:5px}
+.winner-pot{font-size:1.2rem;color:var(--text-on-dark);margin-bottom:22px}
+.winner-pot span{color:var(--gold);font-weight:700}
+.winner-cards{display:flex;justify-content:center;gap:10px;margin-bottom:22px}
+.scoreboard{margin-bottom:20px;width:100%}
+.score-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(201,168,76,.1);font-size:.92rem}
+.score-row .sname{color:var(--text-on-dark)}
+.score-row .scoins{color:var(--gold);font-weight:600}
+.winner-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn-secondary{padding:11px 26px;border-radius:50px;border:1px solid rgba(201,168,76,.4);background:transparent;color:var(--gold);font-family:'Playfair Display',serif;font-size:.95rem;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{background:rgba(201,168,76,.1)}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(10,30,18,.97);border:1px solid rgba(201,168,76,.4);border-radius:10px;padding:10px 22px;color:var(--gold-pale);font-size:.92rem;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+@media(max-width:480px){
+  .panel,.lobby-panel,.winner-panel{padding:22px 18px}
+  .card{width:48px;height:68px}
+}
+</style>
+</head>
+<body>
+<div id="table-bg"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 1 — FIREBASE CONFIG
+══════════════════════════════════════ -->
+<div id="config" class="screen active">
+  <div class="logo">
+    <h1>Teen Patti</h1>
+    <span class="devanagari">तीन पत्ती</span>
+    <div class="card-suits">♠ ♥ ♦ ♣</div>
+    <div class="subtitle">Multiplayer</div>
+  </div>
+  <div class="panel">
+    <div class="config-notice">
+      This game needs a free <strong style="color:var(--gold)">Firebase Realtime Database</strong> to sync between devices.<br><br>
+      1. Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
+      2. Create a project → Add a web app → Copy the config<br>
+      3. Enable <strong>Realtime Database</strong> (Start in test mode)<br>
+      4. Paste your values below and click Save
+    </div>
+    <div class="config-inputs">
+      <input id="cfg_apiKey"        placeholder="apiKey" autocomplete="off">
+      <input id="cfg_authDomain"    placeholder="authDomain  (xxx.firebaseapp.com)">
+      <input id="cfg_databaseURL"   placeholder="databaseURL  (https://xxx.firebaseio.com)">
+      <input id="cfg_projectId"     placeholder="projectId">
+    </div>
+    <button class="btn-primary" onclick="saveConfig()">Save & Continue ♠</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 2 — HOME (create / join)
+══════════════════════════════════════ -->
+<div id="home" class="screen">
+  <div class="logo">
+    <h1>Teen Patti</h1>
+    <span class="devanagari">तीन पत्ती</span>
+    <div class="card-suits">♠ ♥ ♦ ♣</div>
+  </div>
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('create')">Create Room</button>
+      <button class="tab-btn"        onclick="switchTab('join')">Join Room</button>
+    </div>
+
+    <!-- CREATE -->
+    <div id="tab-create">
+      <label class="field-label">Your Name</label>
+      <input class="text-input" id="hostName" placeholder="Enter your name" maxlength="18">
+
+      <label class="field-label">Number of Players</label>
+      <div class="player-count-row" id="countBtns"></div>
+
+      <label class="field-label">Boot Amount</label>
+      <div class="boot-row">
+        <input type="number" id="bootAmt" value="10" min="2" max="500">
+        <span class="coin-label">Starting coins: 1000</span>
+      </div>
+
+      <button class="btn-primary" onclick="createRoom()">Create Room ♠</button>
+    </div>
+
+    <!-- JOIN -->
+    <div id="tab-join" style="display:none">
+      <label class="field-label">Your Name</label>
+      <input class="text-input" id="joinName" placeholder="Enter your name" maxlength="18">
+
+      <label class="field-label">Room Code</label>
+      <input class="text-input big" id="joinCode" placeholder="XXXX" maxlength="4">
+
+      <button class="btn-primary" onclick="joinRoom()">Join Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 3 — LOBBY (host waits)
+══════════════════════════════════════ -->
+<div id="lobby" class="screen">
+  <div class="logo"><h1>Teen Patti</h1><span class="devanagari">तीन पत्ती</span></div>
+  <div class="lobby-panel">
+    <div class="room-code-display">
+      <div class="label">Room Code — Share with friends</div>
+      <div class="code" id="lobbyCode">----</div>
+    </div>
+    <div class="divider-line"></div>
+    <div class="players-waiting">
+      <div class="pwlabel">Players Joined</div>
+      <div id="lobbyPlayers"></div>
+    </div>
+    <div class="lobby-hint" id="lobbyHint">Waiting for players…</div>
+    <button class="btn-primary" id="startBtn" onclick="hostStartGame()" disabled>Start Game ♠</button>
+    <div style="margin-top:10px">
+      <button class="btn-secondary" style="width:100%" onclick="leaveRoom()">Leave Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 4 — WAITING (non-host)
+══════════════════════════════════════ -->
+<div id="waiting" class="screen">
+  <div class="waiting-inner">
+    <div class="spinner"></div>
+    <h2>Waiting for Host</h2>
+    <p id="waitingMsg">The host will start the game soon…</p>
+    <button class="btn-secondary" onclick="leaveRoom()">Leave</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 5 — GAME
+══════════════════════════════════════ -->
+<div id="game" class="screen"></div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 6 — WINNER
+══════════════════════════════════════ -->
+<div id="winner" class="screen"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════
+const SUITS = ['♠','♥','♦','♣'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RANK_VAL = {2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
+const RED_SUITS = new Set(['♥','♦']);
+const START_COINS = 1000;
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let db = null;
+let ME = { name:'', roomCode:'', playerIdx:-1, isHost:false };
+let roomRef = null;
+let unsubscribe = null;
+let localRaiseOpen = false;
+let lastRenderedTurn = -1;
+
+// ═══════════════════════════════════════════════════
+//  SETUP UI
+// ═══════════════════════════════════════════════════
+(function initUI(){
+  // load saved config
+  const saved = getSavedConfig();
+  if (saved) {
+    document.getElementById('cfg_apiKey').value       = saved.apiKey || '';
+    document.getElementById('cfg_authDomain').value   = saved.authDomain || '';
+    document.getElementById('cfg_databaseURL').value  = saved.databaseURL || '';
+    document.getElementById('cfg_projectId').value    = saved.projectId || '';
+    // auto-init if complete
+    if (saved.apiKey && saved.databaseURL) { initFirebase(saved); showScreen('home'); }
+  }
+  // player count buttons
+  const row = document.getElementById('countBtns');
+  for (let i=2;i<=9;i++){
+    const b = document.createElement('button');
+    b.className='cnt-btn'+(i===3?' active':'');
+    b.textContent=i;
+    b.onclick=()=>{document.querySelectorAll('.cnt-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active')};
+    row.appendChild(b);
+  }
+})();
+
+function getSavedConfig(){
+  try{ return JSON.parse(localStorage.getItem('tp_fb_config')); }catch(e){ return null; }
+}
+function saveConfig(){
+  const cfg = {
+    apiKey:       document.getElementById('cfg_apiKey').value.trim(),
+    authDomain:   document.getElementById('cfg_authDomain').value.trim(),
+    databaseURL:  document.getElementById('cfg_databaseURL').value.trim(),
+    projectId:    document.getElementById('cfg_projectId').value.trim(),
+  };
+  if (!cfg.apiKey || !cfg.databaseURL) { showToast('Please fill in at least apiKey and databaseURL'); return; }
+  try {
+    initFirebase(cfg);
+    localStorage.setItem('tp_fb_config', JSON.stringify(cfg));
+    showScreen('home');
+    showToast('Firebase connected ✓');
+  } catch(e) { showToast('Firebase error: ' + e.message); }
+}
+function initFirebase(cfg){
+  if (firebase.apps.length) firebase.app().delete().catch(()=>{});
+  // small delay after delete
+  firebase.initializeApp(cfg);
+  db = firebase.database();
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', (i===0&&tab==='create')||(i===1&&tab==='join')));
+  document.getElementById('tab-create').style.display = tab==='create'?'block':'none';
+  document.getElementById('tab-join').style.display   = tab==='join'?'block':'none';
+}
+
+// ═══════════════════════════════════════════════════
+//  ROOM MANAGEMENT
+// ═══════════════════════════════════════════════════
+function genCode(){ return Math.random().toString(36).substr(2,4).toUpperCase(); }
+
+async function createRoom(){
+  if (!db) { showToast('Firebase not connected'); return; }
+  const name = document.getElementById('hostName').value.trim();
+  if (!name) { showToast('Enter your name'); return; }
+  const maxPlayers = +document.querySelector('.cnt-btn.active').textContent;
+  const boot = Math.max(2, +document.getElementById('bootAmt').value || 10);
+
+  const code = genCode();
+  ME = { name, roomCode: code, playerIdx: 0, isHost: true };
+  roomRef = db.ref('rooms/' + code);
+
+  const roomData = {
+    host: name,
+    maxPlayers,
+    boot,
+    status: 'lobby',  // lobby | playing | roundOver
+    players: [{ name, coins: START_COINS, ready: true }],
+    gameState: null,
+  };
+  await roomRef.set(roomData);
+  subscribeRoom();
+  document.getElementById('lobbyCode').textContent = code;
+  showScreen('lobby');
+}
+
+async function joinRoom(){
+  if (!db) { showToast('Firebase not connected'); return; }
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!name) { showToast('Enter your name'); return; }
+  if (code.length !== 4) { showToast('Enter a valid 4-letter room code'); return; }
+
+  const snap = await db.ref('rooms/' + code).get();
+  if (!snap.exists()) { showToast('Room not found'); return; }
+  const room = snap.val();
+  if (room.status !== 'lobby') { showToast('Game already in progress'); return; }
+  const players = room.players || [];
+  if (players.length >= room.maxPlayers) { showToast('Room is full'); return; }
+
+  const idx = players.length;
+  ME = { name, roomCode: code, playerIdx: idx, isHost: false };
+  roomRef = db.ref('rooms/' + code);
+  await roomRef.child('players/' + idx).set({ name, coins: START_COINS, ready: true });
+
+  subscribeRoom();
+  document.getElementById('waitingMsg').textContent = `Room ${code} — waiting for host to start…`;
+  showScreen('waiting');
+}
+
+function subscribeRoom(){
+  if (unsubscribe) unsubscribe();
+  const handler = roomRef.on('value', snap => {
+    if (!snap.exists()) { leaveRoom(); return; }
+    const room = snap.val();
+    onRoomUpdate(room);
+  });
+  unsubscribe = () => roomRef.off('value', handler);
+}
+
+function onRoomUpdate(room){
+  // Update ME.playerIdx in case of re-join / name match
+  if (room.players) {
+    const idx = room.players.findIndex(p => p.name === ME.name);
+    if (idx !== -1) ME.playerIdx = idx;
+  }
+
+  if (room.status === 'lobby') {
+    // update lobby player list
+    const plEl = document.getElementById('lobbyPlayers');
+    if (plEl && room.players) {
+      plEl.innerHTML = (room.players || []).map((p,i) =>
+        `<span class="player-pill"><span class="dot ${i===0?'host':''}"></span>${p.name}${i===0?' (host)':''}</span>`
+      ).join('');
+      const count = room.players.length;
+      const max = room.maxPlayers;
+      const hint = document.getElementById('lobbyHint');
+      const startBtn = document.getElementById('startBtn');
+      if (hint) hint.textContent = `${count} / ${max} players joined`;
+      if (startBtn) startBtn.disabled = count < 2;
+    }
+    return;
+  }
+
+  if (room.status === 'playing' || room.status === 'roundOver') {
+    if (!room.gameState) return;
+    const gs = room.gameState;
+
+    if (room.status === 'roundOver') {
+      renderWinner(gs, room);
+      return;
+    }
+
+    // Render game — only if it's a new turn or screen isn't game
+    renderGameFromState(gs, room);
+  }
+}
+
+async function leaveRoom(){
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  // If host, delete room
+  if (ME.isHost && roomRef) await roomRef.remove().catch(()=>{});
+  ME = { name:'', roomCode:'', playerIdx:-1, isHost:false };
+  roomRef = null;
+  showScreen('home');
+}
+
+// ═══════════════════════════════════════════════════
+//  HOST STARTS GAME
+// ═══════════════════════════════════════════════════
+function hostStartGame(){
+  if (!ME.isHost) return;
+  roomRef.get().then(snap => {
+    const room = snap.val();
+    const players = room.players || [];
+    const gs = buildInitialGameState(players, room.boot);
+    roomRef.update({ status: 'playing', gameState: gs });
+  });
+}
+
+function buildInitialGameState(players, boot){
+  const deck = buildDeck(); shuffle(deck);
+  const gamePlayers = players.map(p => ({
+    name: p.name,
+    coins: p.coins,
+    cards: [deck.pop(), deck.pop(), deck.pop()],
+    folded: false,
+    seen: false,
+    betThisRound: boot,
+  }));
+  let pot = 0;
+  gamePlayers.forEach(p => { p.coins -= boot; pot += boot; });
+  return {
+    players: gamePlayers,
+    boot,
+    pot,
+    currentStake: boot,
+    currentPlayer: 0,
+    log: ['Round started. Boot collected from all players.'],
+    raiseOpen: false,
+    sideShowRequest: null,
+  };
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER GAME
+// ═══════════════════════════════════════════════════
+function renderGameFromState(gs, room){
+  const myIdx = ME.playerIdx;
+  const isMyTurn = gs.currentPlayer === myIdx;
+
+  showScreen('game');
+  const el = document.getElementById('game');
+
+  const me = gs.players[myIdx];
+  if (!me) return;
+  
+  // Check if there's a pending side-show request for this player
+  if (gs.sideShowRequest && gs.sideShowRequest.targetIdx === myIdx && gs.sideShowRequest.status === 'pending') {
+    const initiator = gs.players[gs.sideShowRequest.initiatorIdx];
+    el.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-box">
+          <h2>⚔️ Side-Show Request</h2>
+          <p>${initiator.name} is offering you a side-show!</p>
+          <div class="modal-buttons">
+            <button class="modal-btn accept" onclick="respondToSideShow(true)">Accept</button>
+            <button class="modal-btn decline" onclick="respondToSideShow(false)">Decline</button>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const isBlind = !me.seen;
+  const callAmt = isBlind ? gs.currentStake / 2 : gs.currentStake;
+  const activePlayers = gs.players.filter(p => !p.folded).length;
+
+  el.innerHTML = `
+    <div class="pot-bar">
+      <span class="pot-label">Pot</span>
+      <span class="pot-amount">${gs.pot} 🪙</span>
+      <span class="current-stake">Stake: ${gs.currentStake} | Room: ${ME.roomCode}</span>
+    </div>
+
+    ${isMyTurn && !me.folded ? `<div class="your-turn-badge">⚡ YOUR TURN</div>` : ''}
+
+    <!-- MY AREA -->
+    <div class="player-area ${isMyTurn&&!me.folded?'my-turn':''}">
+      <div class="player-header">
+        <span class="player-name-tag">${me.name} (You)</span>
+        <span class="player-status-tag ${me.folded?'folded':isMyTurn?'active-turn':''}">${me.folded?'Folded':isBlind?'Blind':'Seen'}</span>
+        <span class="player-coins">${me.coins} 🪙</span>
+      </div>
+      <div class="cards-row">
+        ${me.seen || me.folded
+          ? me.cards.map(c=>cardHTML(c,'face-up')).join('')
+          : me.cards.map(()=>cardHTML(null,'face-down')).join('')}
+      </div>
+
+      ${isMyTurn && !me.folded ? `
+      <div class="actions-row" id="actRow">
+        ${!me.seen ? `<button class="act-btn see-cards" onclick="doSee()">👁 See Cards</button>` : ''}
+        <button class="act-btn fold" onclick="doFold()">Fold</button>
+        <button class="act-btn call ${me.coins<callAmt?'disabled':''}" onclick="doCall()" ${me.coins<callAmt?'disabled':''}>
+          Chaal ${callAmt}🪙
+        </button>
+        <button class="act-btn raise ${!me.seen||me.coins<gs.currentStake*2?'disabled':''}"
+          onclick="toggleRaiseUI()" ${!me.seen||me.coins<gs.currentStake*2?'disabled':''}>Raise</button>
+        ${activePlayers===2&&me.seen ? `<button class="act-btn show" onclick="doShow()">Show</button>` : ''}
+        ${activePlayers>2&&me.seen ? `<button class="act-btn show" onclick="doSideShow()">Side-Show</button>` : ''}
+      </div>
+      <div id="raiseSection"></div>
+      ${isBlind?'<div class="blind-notice">Playing blind — half the stake required</div>':''}
+      ` : me.folded ? '' : `<div class="waiting-notice">Waiting for ${gs.players[gs.currentPlayer]?.name}…</div>`}
+    </div>
+
+    <!-- OTHER PLAYERS -->
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${gs.players.map((op,oi) => oi===myIdx?'' : `
+        <div class="player-area ${!op.folded&&gs.currentPlayer===oi?'my-turn':''}" style="opacity:${op.folded?.5:1}">
+          <div class="player-header">
+            <span class="player-name-tag">${op.name}</span>
+            <span class="player-status-tag ${op.folded?'folded':gs.currentPlayer===oi?'active-turn':''}">${op.folded?'Folded':op.seen?'Seen':'Blind'}</span>
+            <span class="player-coins">${op.coins} 🪙</span>
+          </div>
+          <div class="cards-row">${op.cards.map(()=>cardHTML(null,'face-down')).join('')}</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="game-log">
+      ${gs.log.slice().reverse().map((l,i)=>`<p class="${i===0?'highlight':''}">${l}</p>`).join('')}
+    </div>
+  `;
+}
+
+function cardHTML(card, type){
+  if (type==='face-down') return `<div class="card face-down"></div>`;
+  const isRed = RED_SUITS.has(card.suit);
+  return `<div class="card face-up ${isRed?'red-card':'black-card'}">
+    <div class="rank">${card.rank}${card.suit}</div>
+    <div class="suit-big">${card.suit}</div>
+    <div class="rank" style="transform:rotate(180deg)">${card.rank}${card.suit}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  PLAYER ACTIONS (write to Firebase)
+// ═══════════════════════════════════════════════════
+function getGS(cb){
+  roomRef.child('gameState').get().then(snap => cb(snap.val()));
+}
+
+function doSee(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    gs.players[ME.playerIdx].seen = true;
+    gs.log.push(`${gs.players[ME.playerIdx].name} looked at their cards.`);
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function doFold(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    gs.players[ME.playerIdx].folded = true;
+    gs.log.push(`${gs.players[ME.playerIdx].name} folded.`);
+    const remaining = gs.players.filter(p=>!p.folded);
+    if (remaining.length===1){
+      remaining[0].coins += gs.pot;
+      gs.log.push(`${remaining[0].name} wins the pot of ${gs.pot}🪙!`);
+      roomRef.update({ status:'roundOver', gameState: gs });
+    } else {
+      gs.currentPlayer = nextActivePlayer(gs, ME.playerIdx);
+      roomRef.update({ gameState: gs });
+    }
+  });
+}
+
+function doCall(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    const p = gs.players[ME.playerIdx];
+    const isBlind = !p.seen;
+    const amt = isBlind ? gs.currentStake/2 : gs.currentStake;
+    if (p.coins < amt) return;
+    p.coins -= amt; gs.pot += amt; p.betThisRound += amt;
+    gs.log.push(`${p.name} called ${amt}🪙.`);
+    gs.currentPlayer = nextActivePlayer(gs, ME.playerIdx);
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function toggleRaiseUI(){
+  localRaiseOpen = !localRaiseOpen;
+  const sec = document.getElementById('raiseSection');
+  if (!sec) return;
+  if (localRaiseOpen){
+    roomRef.child('gameState/currentStake').get().then(snap=>{
+      const min = (snap.val()||10)*2;
+      sec.innerHTML=`<div class="raise-row">
+        <input type="number" id="raiseAmt" placeholder="Min ${min}" min="${min}">
+        <button class="raise-confirm" onclick="doRaise()">Confirm</button>
+      </div>`;
+    });
+  } else { sec.innerHTML=''; }
+}
+
+function doRaise(){
+  const val = +document.getElementById('raiseAmt').value;
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    const p = gs.players[ME.playerIdx];
+    const min = gs.currentStake * 2;
+    if (!val || val < min) { showToast(`Raise must be at least ${min}`); return; }
+    if (p.coins < val) { showToast('Not enough coins!'); return; }
+    gs.currentStake = val;
+    p.coins -= val; gs.pot += val; p.betThisRound += val;
+    gs.log.push(`${p.name} raised stake to ${val}🪙!`);
+    gs.currentPlayer = nextActivePlayer(gs, ME.playerIdx);
+    localRaiseOpen = false;
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function doShow(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    const p = gs.players[ME.playerIdx];
+    const showCost = gs.currentStake * 2;
+    if (!p.seen || p.coins < showCost) return;
+    const other = gs.players.find((op,oi)=>oi!==ME.playerIdx&&!op.folded);
+    if (!other || !other.seen) { showToast(`${other?.name||'opponent'} must be seen for a show`); return; }
+    p.coins -= showCost; gs.pot += showCost;
+    gs.log.push(`${p.name} called Show!`);
+    // determine winner
+    const actives = gs.players.filter(pp=>!pp.folded);
+    let best = actives[0];
+    for (let i=1;i<actives.length;i++) if (compareHands(actives[i].cards, best.cards)>0) best=actives[i];
+    best.coins += gs.pot;
+    gs.log.push(`${best.name} wins the pot of ${gs.pot}🪙!`);
+    roomRef.update({ status:'roundOver', gameState: gs });
+  });
+}
+
+function doSideShow(){
+  getGS(gs => {
+    if (gs.currentPlayer !== ME.playerIdx) return;
+    const p = gs.players[ME.playerIdx];
+    const showCost = gs.currentStake * 2;
+    if (!p.seen || p.coins < showCost) return;
+    
+    // Find previous active player (going backwards from current player)
+    let targetIdx = (ME.playerIdx - 1 + gs.players.length) % gs.players.length;
+    let tries = 0;
+    while (gs.players[targetIdx].folded && tries < gs.players.length) {
+      targetIdx = (targetIdx - 1 + gs.players.length) % gs.players.length;
+      tries++;
+    }
+    
+    if (tries >= gs.players.length || gs.players[targetIdx].folded) return;
+    
+    // Set side-show request
+    gs.sideShowRequest = {
+      initiatorIdx: ME.playerIdx,
+      targetIdx: targetIdx,
+      status: 'pending'
+    };
+    gs.log.push(`${p.name} offered a side-show to ${gs.players[targetIdx].name}!`);
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function respondToSideShow(accepted){
+  getGS(gs => {
+    const req = gs.sideShowRequest;
+    if (!req || req.targetIdx !== ME.playerIdx) return;
+    
+    const initiator = gs.players[req.initiatorIdx];
+    const me = gs.players[req.targetIdx];
+    const showCost = gs.currentStake * 2;
+    
+    if (accepted) {
+      // Both pay for side-show
+      initiator.coins -= showCost;
+      me.coins -= showCost;
+      gs.pot += showCost * 2;
+      
+      // Compare hands
+      const cmp = compareHands(initiator.cards, me.cards);
+      if (cmp > 0) {
+        // Initiator wins
+        me.folded = true;
+        gs.log.push(`Side-show: ${initiator.name} wins over ${me.name}!`);
+      } else {
+        // Target wins
+        initiator.folded = true;
+        gs.log.push(`Side-show: ${me.name} wins over ${initiator.name}!`);
+        gs.currentPlayer = nextActivePlayer(gs, req.initiatorIdx);
+      }
+    } else {
+      gs.log.push(`${me.name} declined side-show. ${initiator.name} can choose another action.`);
+      // Initiator's turn continues - no change to currentPlayer
+    }
+    
+    gs.sideShowRequest = null;
+    roomRef.update({ gameState: gs });
+  });
+}
+
+function nextActivePlayer(gs, fromIdx){
+  let next = (fromIdx+1) % gs.players.length;
+  let loops = 0;
+  while (gs.players[next].folded){
+    next = (next+1) % gs.players.length;
+    if (++loops > gs.players.length) break;
+  }
+  return next;
+}
+
+// ═══════════════════════════════════════════════════
+//  WINNER SCREEN
+// ═══════════════════════════════════════════════════
+function renderWinner(gs, room){
+  const winner = gs.players.reduce((best,p) =>
+    (!best || p.coins > best.coins) ? p : best, null);
+  // find the one who won the last pot (highest coins after pot)
+  // Instead find from log
+  const lastLog = gs.log[gs.log.length-1] || '';
+  const winnerName = lastLog.match(/^(.+) wins the pot/)?.[1] || gs.players.find(p=>!p.folded)?.name || '';
+  const winnerP = gs.players.find(p=>p.name===winnerName) || gs.players.find(p=>!p.folded) || gs.players[0];
+  const hr = handRank(winnerP.cards);
+  const isHost = ME.isHost;
+
+  showScreen('winner');
+  const el = document.getElementById('winner');
+  el.innerHTML = `
+    <div class="winner-panel">
+      <div class="winner-emoji">🏆</div>
+      <h2>Winner</h2>
+      <div class="winner-name">${winnerP.name}</div>
+      <div class="winner-hand">${hr.label}</div>
+      <div class="winner-cards">${winnerP.cards.map(c=>cardHTML(c,'face-up')).join('')}</div>
+      <div class="winner-pot">Wins <span>${gs.pot} 🪙</span></div>
+      <div class="scoreboard">
+        ${[...gs.players].sort((a,b)=>b.coins-a.coins).map(p=>`
+          <div class="score-row">
+            <span class="sname">${p.name}${p.name===winnerP.name?' 🏆':''}</span>
+            <span class="scoins">${p.coins} 🪙</span>
+          </div>`).join('')}
+      </div>
+      <div class="winner-actions">
+        ${isHost ? `<button class="btn-primary" onclick="hostNextRound()" style="min-width:150px">Next Round ♠</button>` : `<div style="font-size:.85rem;color:rgba(240,230,204,.4);font-style:italic">Waiting for host to start next round…</div>`}
+        <button class="btn-secondary" onclick="leaveRoom()">Leave</button>
+      </div>
+    </div>`;
+}
+
+function hostNextRound(){
+  if (!ME.isHost) return;
+  roomRef.get().then(snap=>{
+    const room = snap.val();
+    // Use room.players as source of truth for order, update coins from gameState
+    const gameStatePlayers = room.gameState?.players || [];
+    let players = (room.players || [])
+      .map(p => {
+        const gs_p = gameStatePlayers.find(gsp => gsp.name === p.name);
+        return { name: p.name, coins: gs_p?.coins || p.coins, ready: true };
+      })
+      .filter(p => p.coins >= (room.boot||10));
+    if (players.length < 2) { showToast('Not enough players with coins!'); return; }
+    // rotate dealer
+    players.push(players.shift());
+    const gs = buildInitialGameState(players, room.boot);
+    // Update room.players with rotated order so next round has correct order
+    roomRef.update({ status:'playing', gameState: gs, players: players });
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  HAND EVALUATION
+// ═══════════════════════════════════════════════════
+function handRank(cards){
+  if (!cards||!cards.length) return {rank:0,tiebreak:[],label:'Unknown'};
+  const rv = cards.map(c=>RANK_VAL[c.rank]).sort((a,b)=>b-a);
+  const suits = cards.map(c=>c.suit);
+  const flush = suits.every(s=>s===suits[0]);
+  const sorted = [...rv].sort((a,b)=>a-b);
+  if (rv[0]===rv[1]&&rv[1]===rv[2]) return {rank:6,tiebreak:[rv[0]],label:'Trail (Set)'};
+  let seq = (sorted[2]-sorted[1]===1&&sorted[1]-sorted[0]===1);
+  const wheel = sorted.join(',') === '2,3,14';
+  if (wheel) seq=true;
+  if (flush&&seq) return {rank:5,tiebreak:wheel?[3,2,14]:[...sorted].reverse(),label:'Pure Sequence'};
+  if (seq) return {rank:4,tiebreak:wheel?[3,2,14]:[...sorted].reverse(),label:'Sequence'};
+  if (flush) return {rank:3,tiebreak:[...sorted].reverse(),label:'Color (Flush)'};
+  const counts={};
+  rv.forEach(v=>counts[v]=(counts[v]||0)+1);
+  const vals=Object.keys(counts).map(Number);
+  const pair=vals.find(v=>counts[v]===2);
+  if (pair){
+    const kicker=vals.find(v=>counts[v]===1);
+    return {rank:2,tiebreak:[pair,kicker],label:'Pair'};
+  }
+  return {rank:1,tiebreak:[...sorted].reverse(),label:'High Card'};
+}
+
+function compareHands(a,b){
+  const ha=handRank(a),hb=handRank(b);
+  if (ha.rank!==hb.rank) return ha.rank>hb.rank?1:-1;
+  for (let i=0;i<ha.tiebreak.length;i++){
+    if (ha.tiebreak[i]!==hb.tiebreak[i]) return ha.tiebreak[i]>hb.tiebreak[i]?1:-1;
+  }
+  return 0;
+}
+
+// ═══════════════════════════════════════════════════
+//  DECK UTILS
+// ═══════════════════════════════════════════════════
+function buildDeck(){
+  const d=[];
+  for (const s of SUITS) for (const r of RANKS) d.push({rank:r,suit:s});
+  return d;
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+
+// ═══════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// Handle tab/window close — remove player if not host
+window.addEventListener('beforeunload', ()=>{
+  if (roomRef && !ME.isHost){
+    // best-effort
+    roomRef.child('players/'+ME.playerIdx).remove();
+  }
+});
+</script>
+</body>
+</html>
